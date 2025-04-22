@@ -145,37 +145,19 @@ def count_peaks(arr, n):
 if setup_max30101():
     print("\nStarting measurements...")
     while True:
-        try:
+        sample_len = 10
+        red_samples = []
+        ir_samples = []
+        for i in range(0, sample_len):
             # Read 6 bytes from FIFO (3 bytes for Red, 3 bytes for IR)
             fifo_data = read_reg(REG_FIFO_DATA, 6)
-
             if fifo_data is not None and len(fifo_data) == 6:
                 # Combine bytes to get 18-bit Red value
                 # Data is left-justified (MSB is always at bit 17)
                 # Mask the first byte's upper 6 bits as they are unused (datasheet Table 1)
                 red_val = ((fifo_data[0] & 0x03) << 16) | (fifo_data[1] << 8) | fifo_data[2]
-
                 # Combine bytes to get 18-bit IR value
                 ir_val = ((fifo_data[3] & 0x03) << 16) | (fifo_data[4] << 8) | fifo_data[5]
-
-                # Print the raw values
-                # print(f"RED: {red_val}  IR: {ir_val}")
-
-
-                sample_len = 10
-                red_samples = []
-                ir_samples = []
-                for i in range(0, sample_len):
-                    red_samples.append(red_val)
-                    ir_samples.append(ir_val)
-
-                red_peaks = count_peaks(red_samples, sample_len)
-                red_dc = sum(red_samples) / sample_len
-                ir_peaks = count_peaks(ir_samples, sample_len)
-                ir_dc = sum(ir_samples) / sample_len
-
-                print(f"red array: {red_samples}, red peaks: {red_peaks}, red dc: {red_dc}")
-                print(f"ir array: {ir_samples}, ir peaks: {ir_peaks}, ir dc: {ir_dc}")
 
             else:
                 print("Failed to read FIFO data.")
@@ -185,14 +167,15 @@ if setup_max30101():
             # The FIFO can hold 32 samples, so this is safe.
             time.sleep_ms(100)
 
-        except KeyboardInterrupt:
-            print("\nStopping measurements.")
-            break
-        except OSError as e:
-            print(f"I2C Error during loop: {e}")
-            # Attempt to re-initialize or just wait
-            time.sleep_ms(1000)
-            # Consider adding re-initialization logic here if errors persist
+            red_samples.append(red_val)
+            ir_samples.append(ir_val)
+        red_peaks = count_peaks(red_samples, sample_len)
+        red_dc = sum(red_samples) / sample_len
+        ir_peaks = count_peaks(ir_samples, sample_len)
+        ir_dc = sum(ir_samples) / sample_len
+
+        print(f"red array: {red_samples}, red peaks: {red_peaks}, red dc: {red_dc}")
+        print(f"ir array: {ir_samples}, ir peaks: {ir_peaks}, ir dc: {ir_dc}")
 else:
     print("Failed to initialize MAX30101. Check wiring and power.")
 
