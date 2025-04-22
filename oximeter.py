@@ -109,6 +109,38 @@ def setup_max30101():
     print("MAX30101 Initialization Complete.")
     return True
 
+def count_peaks(arr, n):
+    """
+    Counts the number of peaks in an array.
+
+    A peak is defined as an element that is greater than its neighbors.
+    The first and last elements are considered peaks if they are greater than their single neighbor.
+
+    Args:
+        arr: The input array.
+        n: The length of the array.
+
+    Returns:
+        The number of peaks in the array.
+    """
+    if n == 0:
+        return 0
+
+    count = 0
+    for i in range(n):
+        if i == 0:  # First element
+            if n == 1 or arr[i] > arr[i + 1]:
+                count += 1
+        elif i == n - 1:  # Last element
+            if arr[i] > arr[i - 1]:
+                count += 1
+        else:  # Intermediate elements
+            if arr[i] > arr[i - 1] and arr[i] > arr[i + 1]:
+                count += 1
+    return count
+
+
+
 # --- Main Loop ---
 if setup_max30101():
     print("\nStarting measurements...")
@@ -127,7 +159,23 @@ if setup_max30101():
                 ir_val = ((fifo_data[3] & 0x03) << 16) | (fifo_data[4] << 8) | fifo_data[5]
 
                 # Print the raw values
-                print(f"RED: {red_val:<6}  IR: {ir_val:<6}")
+                # print(f"RED: {red_val}  IR: {ir_val}")
+
+
+                sample_len = 10
+                red_samples = []
+                ir_samples = []
+                for i in range(0, sample_len):
+                    red_samples.append(red_val)
+                    ir_samples.append(ir_val)
+
+                red_peaks = count_peaks(red_samples, sample_len)
+                red_dc = sum(red_samples) / sample_len
+                ir_peaks = count_peaks(ir_samples, sample_len)
+                ir_dc = sum(ir_samples) / sample_len
+
+                print(f"red array: {red_samples}, red peaks: {red_peaks}, red dc: {red_dc}")
+                print(f"ir array: {ir_samples}, ir peaks: {ir_peaks}, ir dc: {ir_dc}")
 
             else:
                 print("Failed to read FIFO data.")
