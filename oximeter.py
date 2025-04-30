@@ -225,37 +225,36 @@ TODO check if you can read vals -> wait 100ms and loop 10 times to get values fo
      collect data for 1 second and then start to process
 """
 
+sample_len = 10
+red_samples = []
+ir_samples = []
 
 if setup_max30101():
     while True:
-        sample_len = 10
-        red_samples = []
-        ir_samples = []
 
         for i in range(0, sample_len):
             red_val, ir_val = get_ir_red_values()
             red_samples.append(red_val)
             ir_samples.append(ir_val)
+
+            # Wait a bit before reading again. Since sample rate is 100Hz,
+            # reading every 100ms means we check roughly every 10 samples.
+            # The FIFO can hold 32 samples, so this is safe.
+            time.sleep_ms(100)
         
 
         # calculate dc elements
         ir_dc = sum(ir_samples) // sample_len
         red_dc = sum(red_samples) // sample_len
 
-        ir_peaks = count_peaks(ir_samples, sample_len)
-        red_peaks = count_peaks(red_samples, sample_len)
-
-        print(f"red array: {red_samples}, red peaks: {red_peaks}, red dc: {red_dc}")
-        print(f"ir array: {ir_samples}, ir peaks: {ir_peaks}, ir dc: {ir_dc}")
+        # remove dc components from the values 
+        processed_ir_samples = [num - ir_dc for num in ir_samples]
+        processed_red_samples = [num - red_dc for num in red_samples]
 
 
-        # Wait a bit before reading again. Since sample rate is 100Hz,
-        # reading every 100ms means we check roughly every 10 samples.
-        # The FIFO can hold 32 samples, so this is safe.
-        time.sleep_ms(100)
 
-        red_samples.append(red_val)
-        ir_samples.append(ir_val)
+
+
 else:
     print("Failed to initialize MAX30101. Check wiring and power.")
 
