@@ -73,7 +73,7 @@ def setup_max30101():
     # SMP_AVE[2:0] = 010 (4 samples) -> 0x40
     # FIFO_ROLLOVER_EN = 1 -> 0x10
     # FIFO_A_FULL[3:0] = 0 (trigger interrupt when 32-0=32 samples are in FIFO, we read before this)
-    # Let's use 15 (trigger when 32-15 = 17 samples are waiting) -> 0x0F
+    # 15 (trigger when 32-15 = 17 samples are waiting) -> 0x0F
     # Total = 0x40 | 0x10 | 0x0F = 0x5F
     # Using averaging = 1 (no average) for simplicity: 000 -> 0x00
     # Total = 0x00 | 0x10 | 0x0F = 0x1F
@@ -140,27 +140,115 @@ def count_peaks(arr, n):
     return count
 
 
+def find_peaks(arr, n, threshold):
+  """
+  Finds the indices of peaks in an array, ensuring a minimum distance between them.
+
+  Args:
+    arr: The input array (list or numpy array).
+    n: The length of the input array.
+    threshold: The minimum distance allowed between consecutive peaks.
+
+  Returns:
+    A list containing the indices of the peaks found in the array.
+  """
+  peaks = []
+  # Iterate through the array elements, excluding the first and last
+  for i in range(1, n - 1):
+    # Check if the current element is greater than its neighbors
+    if arr[i] > arr[i - 1] and arr[i] > arr[i + 1]:
+      # Check if this is the first peak found or if the distance
+      # from the last found peak meets the threshold
+      if len(peaks) == 0 or i - peaks[-1] >= threshold:
+        peaks.append(i)
+  return peaks
+        
+
+def moving_average(arr, n, k):
+    """
+    Applies a moving average filter to an array.
+
+    Args:
+      arr: The input array (list or numpy array).
+      n: The length of the input array.
+      k: The window size for the moving average.
+
+    Returns:
+      A new array containing the moving average of the input array.
+    """
+    if k <= 0:
+        raise ValueError("Window size k must be positive")
+
+    if k > n:
+        raise ValueError("Window size k cannot be larger than the array length n")
+
+    # Create an array to store the moving average values
+    moving_averages = []
+
+    # Calculate the moving average for each window
+    for i in range(n - k + 1):
+        # Calculate the sum of the current window
+        window_sum = sum(arr[i:i+k])
+
+        # Calculate the average of the current window
+        window_average = window_sum / k
+
+        # Append the average to the list of moving averages
+        moving_averages.append(window_average)
+
+    return moving_averages
+
+def get_ir_red_values():
+    # Read 6 bytes from FIFO (3 bytes for Red, 3 bytes for IR)
+
+    fifo_data = read_reg(REG_FIFO_DATA, 6)
+
+    if fifo_data is not None and len(fifo_data) == 6:
+        # Combine bytes to get 18-bit Red value
+        # Data is left-justified (MSB is always at bit 17)
+        # Mask the first byte's upper 6 bits as they are unused (datasheet Table 1)
+        red_val = ((fifo_data[0] & 0x03) << 16) | (fifo_data[1] << 8) | fifo_data[2]
+
+        # Combine bytes to get 18-bit IR value
+        ir_val = ((fifo_data[3] & 0x03) << 16) | (fifo_data[4] << 8) | fifo_data[5]
+
+        return (ir_val, red_val)
+    else:
+        raise ValueError("Failed to read FIFO data.")
 
 # --- Main Loop ---
-if setup_max30101():
-    print("\nStarting measurements...")
-    while True:
-        sample_len = 10
-        red_samples = []
-        ir_samples = []
-        for i in range(0, sample_len):
-            # Read 6 bytes from FIFO (3 bytes for Red, 3 bytes for IR)
-            fifo_data = read_reg(REG_FIFO_DATA, 6)
-            if fifo_data is not None and len(fifo_data) == 6:
-                # Combine bytes to get 18-bit Red value
-                # Data is left-justified (MSB is always at bit 17)
-                # Mask the first byte's upper 6 bits as they are unused (datasheet Table 1)
-                red_val = ((fifo_data[0] & 0x03) << 16) | (fifo_data[1] << 8) | fifo_data[2]
-                # Combine bytes to get 18-bit IR value
-                ir_val = ((fifo_data[3] & 0x03) << 16) | (fifo_data[4] << 8) | fifo_data[5]
 
-            else:
-                print("Failed to read FIFO data.")
+"""
+TODO check if you can read vals -> wait 100ms and loop 10 times to get values for 1 second
+     since sample rate is 100hz we are checking 10 samples every 100ms 
+
+     collect data for 1 second and then start to process
+"""
+
+
+if setup_max30101():
+    while True:
+        try:
+            sample_len = 10
+            red_samples = []
+            ir_samples = []
+
+            for i in range(0, sample_len):
+                red_val, ir_val = get_ir_red_values()
+                red_samples.append(red_val)
+                ir_samples.append(ir_val)
+            
+
+            # calculate dc elements
+            ir_dc = sum(ir_samples) // sample_len
+            red_dc = sum(red_samples) // sample_len
+
+            ir_peaks = count_peaks(ir_samples, sample_len)
+            red_peaks = count_peaks(red_samples, sample_len)
+
+            print(f"red array: {red_samples}, red peaks: {red_peaks}, red dc: {red_dc}")
+            print(f"ir array: {ir_samples}, ir peaks: {ir_peaks}, ir dc: {ir_dc}")
+
 
             # Wait a bit before reading again. Since sample rate is 100Hz,
             # reading every 100ms means we check roughly every 10 samples.
