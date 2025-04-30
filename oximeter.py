@@ -228,42 +228,34 @@ TODO check if you can read vals -> wait 100ms and loop 10 times to get values fo
 
 if setup_max30101():
     while True:
-        try:
-            sample_len = 10
-            red_samples = []
-            ir_samples = []
+        sample_len = 10
+        red_samples = []
+        ir_samples = []
 
-            for i in range(0, sample_len):
-                red_val, ir_val = get_ir_red_values()
-                red_samples.append(red_val)
-                ir_samples.append(ir_val)
-            
-
-            # calculate dc elements
-            ir_dc = sum(ir_samples) // sample_len
-            red_dc = sum(red_samples) // sample_len
-
-            ir_peaks = count_peaks(ir_samples, sample_len)
-            red_peaks = count_peaks(red_samples, sample_len)
-
-            print(f"red array: {red_samples}, red peaks: {red_peaks}, red dc: {red_dc}")
-            print(f"ir array: {ir_samples}, ir peaks: {ir_peaks}, ir dc: {ir_dc}")
-
-
-            # Wait a bit before reading again. Since sample rate is 100Hz,
-            # reading every 100ms means we check roughly every 10 samples.
-            # The FIFO can hold 32 samples, so this is safe.
-            time.sleep_ms(100)
-
+        for i in range(0, sample_len):
+            red_val, ir_val = get_ir_red_values()
             red_samples.append(red_val)
             ir_samples.append(ir_val)
-        red_peaks = count_peaks(red_samples, sample_len)
-        red_dc = sum(red_samples) / sample_len
+        
+
+        # calculate dc elements
+        ir_dc = sum(ir_samples) // sample_len
+        red_dc = sum(red_samples) // sample_len
+
         ir_peaks = count_peaks(ir_samples, sample_len)
-        ir_dc = sum(ir_samples) / sample_len
+        red_peaks = count_peaks(red_samples, sample_len)
 
         print(f"red array: {red_samples}, red peaks: {red_peaks}, red dc: {red_dc}")
         print(f"ir array: {ir_samples}, ir peaks: {ir_peaks}, ir dc: {ir_dc}")
+
+
+        # Wait a bit before reading again. Since sample rate is 100Hz,
+        # reading every 100ms means we check roughly every 10 samples.
+        # The FIFO can hold 32 samples, so this is safe.
+        time.sleep_ms(100)
+
+        red_samples.append(red_val)
+        ir_samples.append(ir_val)
 else:
     print("Failed to initialize MAX30101. Check wiring and power.")
 
