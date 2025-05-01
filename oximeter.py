@@ -156,7 +156,7 @@ def find_peaks(arr, n, threshold):
   # Iterate through the array elements, excluding the first and last
   for i in range(1, n - 1):
     # Check if the current element is greater than its neighbors
-    if arr[i] > arr[i - 1] and arr[i] > arr[i + 1]:
+    if (arr[i] > arr[i - 1]) and (arr[i] > arr[i + 1]):
       # Check if this is the first peak found or if the distance
       # from the last found peak meets the threshold
       if len(peaks) == 0 or i - peaks[-1] >= threshold:
@@ -218,38 +218,60 @@ def get_ir_red_values():
 
 # --- Main Loop ---
 
-"""
-TODO check if you can read vals -> wait 100ms and loop 10 times to get values for 1 second
-     since sample rate is 100hz we are checking 10 samples every 100ms 
-
-     collect data for 1 second and then start to process
-"""
-
-sample_len = 10
-red_samples = []
-ir_samples = []
+sample_len = 100
 
 if setup_max30101():
     while True:
+        red_samples = []
+        ir_samples = []
+
+        """
+        TODO: 1 second samples are not enough for a good moving average. need to increase the sample length.
+        """
 
         for i in range(0, sample_len):
             red_val, ir_val = get_ir_red_values()
+            # print(f"Red: {red_val}, IR: {ir_val}")
             red_samples.append(red_val)
             ir_samples.append(ir_val)
 
-            # Wait a bit before reading again. Since sample rate is 100Hz,
-            # reading every 100ms means we check roughly every 10 samples.
-            # The FIFO can hold 32 samples, so this is safe.
-            time.sleep_ms(100)
+            # we are reading 10 samples every 100ms which means we have 100 samples for each second
+            time.sleep_ms(10)
         
 
         # calculate dc elements
         ir_dc = sum(ir_samples) // sample_len
         red_dc = sum(red_samples) // sample_len
 
-        # remove dc components from the values 
+        print(f"ir dc: {ir_dc}")
+        print(f"red dc: {red_dc}")
+
+        #remove dc components from the values
         processed_ir_samples = [num - ir_dc for num in ir_samples]
         processed_red_samples = [num - red_dc for num in red_samples]
+
+
+        # calculate moving average
+        filter_window = 10
+        moving_average_ir = moving_average(processed_ir_samples, sample_len, filter_window)
+        moving_average_red = moving_average(processed_red_samples, sample_len, filter_window)
+
+        psd_sample_len = len(moving_average_ir)
+
+        # print(f"moving average ir: {moving_average_ir}")
+        # print(f"processed ir samples: {processed_ir_samples}")
+        # print(f"actual ir samples: {ir_samples}")
+
+        # find peaks
+        ir_peaks = find_peaks(moving_average_ir, psd_sample_len, 10)
+        red_peaks = find_peaks(moving_average_red, psd_sample_len, 10)
+        print(f"ir peaks: {ir_peaks}")
+        print(f"red peaks: {red_peaks}")
+        # count peaks
+        ir_peak_count = count_peaks(moving_average_ir, psd_sample_len)
+        red_peak_count = count_peaks(moving_average_red, psd_sample_len)
+        print(f"ir peak count: {ir_peak_count}")
+
 
 
 
