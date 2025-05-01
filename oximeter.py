@@ -1,3 +1,5 @@
+# A quick way to plot reading: https://g.co/gemini/share/0f928ea2f9cd
+
 import machine
 import time
 
@@ -229,7 +231,7 @@ if setup_max30101():
         TODO: 1 second samples are not enough for a good moving average. need to increase the sample length.
         """
 
-        for i in range(0, sample_len):
+        for i in range(0, sample_len*5):
             red_val, ir_val = get_ir_red_values()
             # print(f"Red: {red_val}, IR: {ir_val}")
             red_samples.append(red_val)
@@ -253,14 +255,14 @@ if setup_max30101():
 
         # calculate moving average
         filter_window = 10
-        moving_average_ir = moving_average(processed_ir_samples, sample_len, filter_window)
-        moving_average_red = moving_average(processed_red_samples, sample_len, filter_window)
+        moving_average_ir = moving_average(processed_ir_samples, sample_len*5, filter_window)
+        moving_average_red = moving_average(processed_red_samples, sample_len*5, filter_window)
 
         psd_sample_len = len(moving_average_ir)
 
-        # print(f"moving average ir: {moving_average_ir}")
-        # print(f"processed ir samples: {processed_ir_samples}")
-        # print(f"actual ir samples: {ir_samples}")
+        print(f"moving average ir: {moving_average_ir}")
+        print(f"processed ir samples: {processed_ir_samples}")
+        print(f"actual ir samples: {ir_samples}")
 
         # find peaks
         ir_peaks = find_peaks(moving_average_ir, psd_sample_len, 10)
