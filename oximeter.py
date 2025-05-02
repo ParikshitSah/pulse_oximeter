@@ -98,7 +98,7 @@ def setup_max30101():
     # Configure LED Pulse Amplitude (Current)
     # Set RED (LED1) and IR (LED2) to a moderate level (e.g., ~7.6mA = 0x24)
     # Refer to Table 8 in the datasheet for typical current values
-    led_current = 0x24 # ~7.6mA
+    led_current = 0x24 # ~7.6mA 
     print(f"Setting LED currents (RED & IR) to register value: {hex(led_current)}")
     write_reg(REG_LED1_PA, led_current) # RED
     write_reg(REG_LED2_PA, led_current) # IR
@@ -111,35 +111,6 @@ def setup_max30101():
     print("MAX30101 Initialization Complete.")
     return True
 
-def count_peaks(arr, n):
-    """
-    Counts the number of peaks in an array.
-
-    A peak is defined as an element that is greater than its neighbors.
-    The first and last elements are considered peaks if they are greater than their single neighbor.
-
-    Args:
-        arr: The input array.
-        n: The length of the array.
-
-    Returns:
-        The number of peaks in the array.
-    """
-    if n == 0:
-        return 0
-
-    count = 0
-    for i in range(n):
-        if i == 0:  # First element
-            if n == 1 or arr[i] > arr[i + 1]:
-                count += 1
-        elif i == n - 1:  # Last element
-            if arr[i] > arr[i - 1]:
-                count += 1
-        else:  # Intermediate elements
-            if arr[i] > arr[i - 1] and arr[i] > arr[i + 1]:
-                count += 1
-    return count
 
 
 def find_peaks(arr, n, threshold):
@@ -221,17 +192,22 @@ def get_ir_red_values():
 
 # --- Main Loop ---
 
-sample_len = 100
+sample_time_s = 5
+sample_len = 100 * sample_time_s
+filter_window = 10
+peak_distance_threshold = 40
 
 if setup_max30101():
+    # wait for sensor to reach equibrilium 
+    time.sleep_ms(200)
     while True:
         red_samples = []
         ir_samples = []
 
 
-        for i in range(0, sample_len*5):
+        # Read samples for 5 seconds
+        for i in range(0, sample_len):
             red_val, ir_val = get_ir_red_values()
-            # print(f"Red: {red_val}, IR: {ir_val}")
             red_samples.append(red_val)
             ir_samples.append(ir_val)
 
@@ -240,8 +216,8 @@ if setup_max30101():
         
 
         # calculate dc elements
-        ir_dc = sum(ir_samples) // sample_len
-        red_dc = sum(red_samples) // sample_len
+        ir_dc = sum(ir_samples) // len(ir_samples)
+        red_dc = sum(red_samples) // len(red_samples)
 
         print(f"ir dc: {ir_dc}")
         print(f"red dc: {red_dc}")
@@ -252,24 +228,23 @@ if setup_max30101():
 
 
         # calculate moving average
-        filter_window = 10
-        moving_average_ir = moving_average(processed_ir_samples, sample_len*5, filter_window)
-        moving_average_red = moving_average(processed_red_samples, sample_len*5, filter_window)
+        moving_average_ir = moving_average(processed_ir_samples, sample_len, filter_window)
+        moving_average_red = moving_average(processed_red_samples, sample_len, filter_window)
 
-        psd_sample_len = len(moving_average_ir)
+        processed_sample_len = len(moving_average_ir)
 
         print(f"moving average ir: {moving_average_ir}")
         print(f"processed ir samples: {processed_ir_samples}")
         print(f"actual ir samples: {ir_samples}")
 
         # find peaks
-        ir_peaks = find_peaks(moving_average_ir, psd_sample_len, 10)
-        red_peaks = find_peaks(moving_average_red, psd_sample_len, 10)
+        ir_peaks = find_peaks(moving_average_ir, processed_sample_len, peak_distance_threshold)
+        red_peaks = find_peaks(moving_average_red, processed_sample_len, peak_distance_threshold)
         print(f"ir peaks: {ir_peaks}")
         print(f"red peaks: {red_peaks}")
         # count peaks
-        ir_peak_count = count_peaks(moving_average_ir, psd_sample_len)
-        red_peak_count = count_peaks(moving_average_red, psd_sample_len)
+        ir_peak_count =  len(ir_peaks)
+        red_peak_count = len(red_peaks)
         print(f"ir peak count: {ir_peak_count}")
 
 
