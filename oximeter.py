@@ -190,10 +190,11 @@ def moving_average(arr, n, k):
     # Calculate the moving average for each window
     for i in range(n - k + 1):
         # Calculate the sum of the current window
-        window_sum = sum(arr[i:i+k])
+        values = [num//k for num in arr[i:i+k]]
+        window_average = sum(values)
 
         # Calculate the average of the current window
-        window_average = window_sum / k
+        # window_average = window_sum / k
 
         # Append the average to the list of moving averages
         moving_averages.append(window_average)
@@ -227,9 +228,6 @@ if setup_max30101():
         red_samples = []
         ir_samples = []
 
-        """
-        TODO: 1 second samples are not enough for a good moving average. need to increase the sample length.
-        """
 
         for i in range(0, sample_len*5):
             red_val, ir_val = get_ir_red_values()
