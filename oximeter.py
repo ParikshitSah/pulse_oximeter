@@ -207,7 +207,7 @@ def average_peak_difference(arr, n) :
     if n < 2 : return 0
 
     for i in range(1, n):
-        diff += (arr[i] - arr[i-1])
+        diff = diff +  (arr[i] - arr[i-1])
     
     return diff // (n - 1)
 
@@ -274,20 +274,32 @@ if setup_max30101():
         avg_ir_peak_diff = average_peak_difference(ir_peaks, ir_peak_count)
         avg_red_peak_diff = average_peak_difference(red_peaks, red_peak_count)
 
+        print(f"avg ir peak diff: {avg_ir_peak_diff}")
+        print(f"avg red peak diff: {avg_red_peak_diff}")
+
         # since 500 samples == 5 seconds, 1 sample is 5/500 is 0.01s or 10ms
         # this means that the avg peak diff is in multiples of 0.01s or 10ms
         # we need to convert it into seconds therefore
-        ir_ac = avg_ir_peak_diff * (sample_time_s // sample_len) 
-        red_ac = avg_red_peak_diff * (sample_time_s // sample_len) 
+        ir_ac = float( avg_ir_peak_diff * (sample_time_s / sample_len)) 
+        red_ac = float(avg_red_peak_diff * (sample_time_s / sample_len)) 
+
+        print(f"ir ac: {ir_ac}")
+        print(f"red ac: {red_ac}")
 
 
         # calculate ir ratio
-        ir_ratio = ir_ac//ir_dc
+        ir_ratio = ir_ac/ir_dc
+        
         # calculate red ratio
-        red_ratio = red_ac // red_dc
+        red_ratio = red_ac / red_dc
+
+        print(f"ir ratio: {ir_ratio}")
+        print(f"red ratio: {red_ratio}")
 
         # calculate R: ratio of ratio
-        ratio_of_ratio = ir_ratio // red_ratio
+        ratio_of_ratio = ir_ratio / red_ratio
+
+        print(f"ratio of ratio: {ratio_of_ratio}")
 
         # calculate spo2
         spo2 = 110 - 25 * ratio_of_ratio
