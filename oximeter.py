@@ -211,6 +211,24 @@ def average_peak_difference(arr, n) :
     
     return diff // (n - 1)
 
+def validate_peak_amplitudes(moving_average_signal, peak_indices, amplitude_variation_threshold=0.5):
+    """
+    Checks if each peak amplitude is within a threshold difference from the last peak.
+    Returns True if valid, False otherwise.
+    """
+    if len(peak_indices) < 2:
+        return False  # Not enough peaks to validate
+
+    for i in range(1, len(peak_indices)):
+        last_amp = moving_average_signal[peak_indices[i-1]]
+        curr_amp = moving_average_signal[peak_indices[i]]
+        if last_amp == 0:
+            return False
+        variation = abs(curr_amp - last_amp) / abs(last_amp)
+        if variation > amplitude_variation_threshold:
+            return False
+    return True
+
 # --- Main Loop ---
 
 sample_time_s = 5
@@ -269,6 +287,14 @@ if setup_max30101():
         ir_peak_count =  len(ir_peaks)
         red_peak_count = len(red_peaks)
         print(f"ir peak count: {ir_peak_count}")
+
+        # --- validate peaks before continuing ---
+        if not validate_peak_amplitudes(moving_average_ir, ir_peaks):
+            print("IR peak amplitude variation too high between consecutive peaks. Signal not valid.")
+            continue
+        if not validate_peak_amplitudes(moving_average_red, red_peaks):
+            print("RED peak amplitude variation too high between consecutive peaks. Signal not valid.")
+            continue
 
         # find the average peak difference 
         avg_ir_peak_diff = average_peak_difference(ir_peaks, ir_peak_count)
