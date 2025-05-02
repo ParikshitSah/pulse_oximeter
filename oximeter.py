@@ -190,6 +190,27 @@ def get_ir_red_values():
     else:
         raise ValueError("Failed to read FIFO data.")
 
+def average_peak_difference(arr, n) :
+    """
+    Calculates the average difference between consecutive elements in an array.
+    Args:
+        arr (list or sequence of int/float): The input array containing numerical values.
+        n (int): The number of elements in the array to consider.
+    Returns:
+        int: The integer average of the differences between consecutive elements.
+             Returns 0 if n is less than 2.
+    Example:
+        >>> average_peak_difference([1, 3, 6, 10], 4)
+        3
+    """
+    diff = 0
+    if n < 2 : return 0
+
+    for i in range(1, n):
+        diff += (arr[i] - arr[i-1])
+    
+    return diff // (n - 1)
+
 # --- Main Loop ---
 
 sample_time_s = 5
@@ -222,6 +243,8 @@ if setup_max30101():
         print(f"ir dc: {ir_dc}")
         print(f"red dc: {red_dc}")
 
+        # --- calculate AC component ---
+
         #remove dc components from the values
         processed_ir_samples = [num - ir_dc for num in ir_samples]
         processed_red_samples = [num - red_dc for num in red_samples]
@@ -246,6 +269,29 @@ if setup_max30101():
         ir_peak_count =  len(ir_peaks)
         red_peak_count = len(red_peaks)
         print(f"ir peak count: {ir_peak_count}")
+
+        # find the average peak difference 
+        avg_ir_peak_diff = average_peak_difference(ir_peaks, ir_peak_count)
+        avg_red_peak_diff = average_peak_difference(red_peaks, red_peak_count)
+
+        # since 500 samples == 5 seconds, 1 sample is 5/500 is 0.01s or 10ms
+        # this means that the avg peak diff is in multiples of 0.01s or 10ms
+        # we need to convert it into seconds therefore
+        ir_ac = avg_ir_peak_diff * (sample_time_s // sample_len) 
+        red_ac = avg_red_peak_diff * (sample_time_s // sample_len) 
+
+
+        # calculate ir ratio
+        ir_ratio = ir_ac//ir_dc
+        # calculate red ratio
+        red_ratio = red_ac // red_dc
+
+        # calculate R: ratio of ratio
+        ratio_of_ratio = ir_ratio // red_ratio
+
+        # calculate spo2
+        spo2 = 110 - 25 * ratio_of_ratio
+        print(f"calculated spo2: {spo2}")
 
 
 
