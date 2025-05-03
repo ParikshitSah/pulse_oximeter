@@ -115,9 +115,6 @@ def setup_max30101():
 
 def find_peaks(arr, n, threshold):
     """
-    TODO fix peak finding algorithm
-
-
     Finds the indices of peaks in an array, ensuring a minimum distance between them.
 
     Args:
@@ -132,7 +129,7 @@ def find_peaks(arr, n, threshold):
     # Iterate through the array elements, excluding the first and last
     for i in range(1, n - 1):
         # Check if the current element is greater than its neighbors
-        if (arr[i] > arr[i - 1]) and (arr[i] > arr[i + 1]):
+        if (arr[i] > arr[i - 1]) and (arr[i] >= arr[i + 1]):
             # Check if this is the first peak found or if the distance
             # from the last found peak meets the threshold
             if len(peaks) == 0:
@@ -230,7 +227,7 @@ def average_peak_difference(arr, n) :
     
     return diff // (n - 1)
 
-def validate_peak_amplitudes(moving_average_signal, peak_indices, amplitude_variation_threshold=110):
+def validate_peak_amplitudes(moving_average_signal, peak_indices, amplitude_variation_threshold=180):
     """
     Checks if each peak amplitude is within a threshold difference from the last peak.
     Returns True if more than half of the amplitude variations are within the threshold, False otherwise.
@@ -267,7 +264,7 @@ def validate_peak_amplitudes(moving_average_signal, peak_indices, amplitude_vari
 
 sample_time_s = 5
 sample_len = 100 * sample_time_s
-filter_window = 25
+filter_window = 35
 peak_distance_threshold = 40
 
 if setup_max30101():
@@ -337,6 +334,7 @@ if setup_max30101():
         red_peak_count = len(red_peaks)
         print(f"ir peak count: {ir_peak_count}")
 
+        # TODO: remove the peaks that do not pass the threshold
         # --- validate peaks before continuing ---
         if not validate_peak_amplitudes(moving_average_ir, ir_peaks):
             print("IR peak amplitude variation too high between consecutive peaks. Signal not valid.")
