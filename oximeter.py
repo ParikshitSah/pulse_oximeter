@@ -114,27 +114,32 @@ def setup_max30101():
 
 
 def find_peaks(arr, n, threshold):
-  """
-  Finds the indices of peaks in an array, ensuring a minimum distance between them.
+    """
+    TODO fix peak finding algorithm
 
-  Args:
-    arr: The input array (list or numpy array).
-    n: The length of the input array.
-    threshold: The minimum distance allowed between consecutive peaks.
 
-  Returns:
-    A list containing the indices of the peaks found in the array.
-  """
-  peaks = []
-  # Iterate through the array elements, excluding the first and last
-  for i in range(1, n - 1):
-    # Check if the current element is greater than its neighbors
-    if (arr[i] > arr[i - 1]) and (arr[i] > arr[i + 1]):
-      # Check if this is the first peak found or if the distance
-      # from the last found peak meets the threshold
-      if len(peaks) == 0 or i - peaks[-1] >= threshold:
-        peaks.append(i)
-  return peaks
+    Finds the indices of peaks in an array, ensuring a minimum distance between them.
+
+    Args:
+      arr: The input array (list or numpy array).
+      n: The length of the input array.
+      threshold: The minimum distance allowed between consecutive peaks.
+
+    Returns:
+      A list containing the indices of the peaks found in the array.
+    """
+    peaks = []
+    # Iterate through the array elements, excluding the first and last
+    for i in range(1, n - 1):
+        # Check if the current element is greater than its neighbors
+        if (arr[i] > arr[i - 1]) and (arr[i] > arr[i + 1]):
+            # Check if this is the first peak found or if the distance
+            # from the last found peak meets the threshold
+            if len(peaks) == 0:
+                peaks.append(i)
+            elif i - peaks[-1] >= threshold:
+                peaks.append(i)
+    return peaks
         
 
 def moving_average(arr, n, k):
@@ -171,6 +176,20 @@ def moving_average(arr, n, k):
         moving_averages.append(window_average)
 
     return moving_averages
+
+def calculate_variance(arr):
+    """
+    Calculates the variance of a list of numbers.
+    Args:
+        arr (list of float/int): Input array.
+    Returns:
+        float: Variance of the array. Returns 0 if array is empty or has one element.
+    """
+    n = len(arr)
+    if n < 2:
+        return 0.0
+    mean = sum(arr) / n
+    return sum((x - mean) ** 2 for x in arr) / (n - 1)
 
 def get_ir_red_values():
     # Read 6 bytes from FIFO (3 bytes for Red, 3 bytes for IR)
@@ -211,29 +230,44 @@ def average_peak_difference(arr, n) :
     
     return diff // (n - 1)
 
-def validate_peak_amplitudes(moving_average_signal, peak_indices, amplitude_variation_threshold=0.5):
+def validate_peak_amplitudes(moving_average_signal, peak_indices, amplitude_variation_threshold=110):
     """
     Checks if each peak amplitude is within a threshold difference from the last peak.
-    Returns True if valid, False otherwise.
+    Returns True if more than half of the amplitude variations are within the threshold, False otherwise.
+    Prints intermediate values for debugging.
     """
     if len(peak_indices) < 2:
+        print("Not enough peaks to validate.")
         return False  # Not enough peaks to validate
+
+    valid_count = 0
+    total_pairs = len(peak_indices) - 1
 
     for i in range(1, len(peak_indices)):
         last_amp = moving_average_signal[peak_indices[i-1]]
         curr_amp = moving_average_signal[peak_indices[i]]
+        print(f"Peak {i-1} index: {peak_indices[i-1]}, amplitude: {last_amp}")
+        print(f"Peak {i} index: {peak_indices[i]}, amplitude: {curr_amp}")
         if last_amp == 0:
-            return False
-        variation = abs(curr_amp - last_amp) / abs(last_amp)
-        if variation > amplitude_variation_threshold:
-            return False
-    return True
+            print("Last amplitude is zero, cannot compute variation.")
+            continue
+        higher_peak = max(last_amp, curr_amp)
+        lower_peak = min(last_amp, curr_amp)
+        variation = abs(higher_peak-lower_peak)
+        print(f"Amplitude variation between peaks {i-1} and {i}: {variation}")
+        if variation <= amplitude_variation_threshold:
+            valid_count += 1
+        else:
+            print(f"Variation {variation} exceeds threshold {amplitude_variation_threshold}.")
+
+    print(f"Valid amplitude variations: {valid_count} out of {total_pairs}")
+    return valid_count > (total_pairs // 2)
 
 # --- Main Loop ---
 
 sample_time_s = 5
 sample_len = 100 * sample_time_s
-filter_window = 10
+filter_window = 25
 peak_distance_threshold = 40
 
 if setup_max30101():
@@ -272,15 +306,30 @@ if setup_max30101():
         moving_average_ir = moving_average(processed_ir_samples, sample_len, filter_window)
         moving_average_red = moving_average(processed_red_samples, sample_len, filter_window)
 
-        processed_sample_len = len(moving_average_ir)
-
         print(f"moving average ir: {moving_average_ir}")
-        print(f"processed ir samples: {processed_ir_samples}")
-        print(f"actual ir samples: {ir_samples}")
+        print(f"moving average red: {moving_average_red}")
+
+
+        # Calculate and print variance of moving averages
+        ir_mavg_variance = calculate_variance(moving_average_ir)
+        red_mavg_variance = calculate_variance(moving_average_red)
+
+        if not ir_mavg_variance <= 35000:
+            print("IR moving average variance too high. Signal not valid.")
+            continue
+
+        print(f"Variance of moving average IR: {ir_mavg_variance}")
+        print(f"Variance of moving average RED: {red_mavg_variance}")
+
+        mavg_ir_len = len(moving_average_ir)
+        mavg_red_len = len(moving_average_red)
+
+        # print(f"processed ir samples: {processed_ir_samples}")
+        # print(f"actual ir samples: {ir_samples}")
 
         # find peaks
-        ir_peaks = find_peaks(moving_average_ir, processed_sample_len, peak_distance_threshold)
-        red_peaks = find_peaks(moving_average_red, processed_sample_len, peak_distance_threshold)
+        ir_peaks = find_peaks(moving_average_ir, mavg_ir_len, peak_distance_threshold)
+        red_peaks = find_peaks(moving_average_red, mavg_red_len, peak_distance_threshold)
         print(f"ir peaks: {ir_peaks}")
         print(f"red peaks: {red_peaks}")
         # count peaks
@@ -323,13 +372,15 @@ if setup_max30101():
         print(f"red ratio: {red_ratio}")
 
         # calculate R: ratio of ratio
-        ratio_of_ratio = ir_ratio / red_ratio
+        ratio_of_ratio = red_ratio / ir_ratio
 
         print(f"ratio of ratio: {ratio_of_ratio}")
 
         # calculate spo2
         spo2 = 110 - 25 * ratio_of_ratio
         print(f"calculated spo2: {spo2}")
+
+        print(f"--" * 20)
 
 
 
