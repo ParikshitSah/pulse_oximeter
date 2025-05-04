@@ -237,9 +237,8 @@ def validate_peak_amplitudes(moving_average_signal, peak_indices, threshold=60):
         print("Not enough peaks to validate.")
         return (False, [])  # Not enough peaks to validate
 
-
     valid_count = 0
-    total_pairs = len(peak_indices) - 1
+    total_pairs = len(peak_indices)
     valid_peaks = [] 
 
     def _compare_variation(first_amp, second_amp):
@@ -248,41 +247,32 @@ def validate_peak_amplitudes(moving_average_signal, peak_indices, threshold=60):
         variation = abs((higher_peak-lower_peak)/higher_peak) * 100
         return variation
 
-    for i in range(1, len(peak_indices)-1):
-        last_amp = moving_average_signal[peak_indices[i-1]]
+    for i in range(len(peak_indices)):
         curr_amp = moving_average_signal[peak_indices[i]]
-        next_amp = moving_average_signal[peak_indices[i+1]]
+        left_variation = None
+        right_variation = None
 
-        left_variation = _compare_variation(last_amp, curr_amp)
-        right_variation = _compare_variation(next_amp, curr_amp)
+        if i > 0:
+            last_amp = moving_average_signal[peak_indices[i-1]]
+            left_variation = _compare_variation(last_amp, curr_amp)
+        if i < len(peak_indices) - 1:
+            next_amp = moving_average_signal[peak_indices[i+1]]
+            right_variation = _compare_variation(next_amp, curr_amp)
 
-        if not (left_variation >= threshold) and (right_variation >= threshold):
+        print(f"Peak {i} index: {peak_indices[i]}, amplitude: {curr_amp}")
+        if left_variation is not None:
+            print(f"Left variation with peak {i-1}: {left_variation}")
+        if right_variation is not None:
+            print(f"Right variation with peak {i+1}: {right_variation}")
+
+        # Validation logic: valid unless both neighbors are over threshold
+        if ((left_variation is None or left_variation < threshold) or
+            (right_variation is None or right_variation < threshold)):
+            print(f"Peak {i} is valid (at least one neighbor variation below threshold {threshold} or no neighbor).")
             valid_count += 1
             valid_peaks.append(peak_indices[i])
-            valid_peaks = list(set(valid_peaks))  # Remove duplicates
-            valid_peaks.sort()  # Sort the valid peaks
         else:
-            print(f"Variation exceeds threshold {threshold}.")
-            print(f"left variation: {left_variation}")
-            print(f"right vairation: {right_variation}")
-
-
-    # for i in range(1, len(peak_indices)):
-    #     last_amp = moving_average_signal[peak_indices[i-1]]
-    #     curr_amp = moving_average_signal[peak_indices[i]]
-    #     print(f"Peak {i-1} index: {peak_indices[i-1]}, amplitude: {last_amp}")
-    #     print(f"Peak {i} index: {peak_indices[i]}, amplitude: {curr_amp}")
-    #     higher_peak = max(last_amp, curr_amp)
-    #     lower_peak = min(last_amp, curr_amp)
-    #     variation = abs((higher_peak-lower_peak)/higher_peak) * 100
-    #     print(f"Amplitude variation between peaks {i-1} and {i}: {variation}")
-    #     if variation <= threshold:
-    #         valid_count += 1
-    #         valid_peaks.append(peak_indices[i])
-    #         valid_peaks = list(set(valid_peaks))  # Remove duplicates
-    #         valid_peaks.sort()  # Sort the valid peaks
-    #     else:
-    #         print(f"Variation {variation} exceeds threshold {threshold}.")
+            print(f"Variation exceeds threshold {threshold} for both neighbors (if present).")
 
     print(f"Valid amplitude variations: {valid_count} out of {total_pairs}")
     print(f"Valid peaks: {valid_peaks}")
