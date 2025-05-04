@@ -1,4 +1,4 @@
-# A quick way to plot reading: https://g.co/gemini/share/0f928ea2f9cd
+# A quick way to plot reading: https://gemini.google.com/share/f342573de92b
 
 import machine
 import time
@@ -227,38 +227,47 @@ def average_peak_difference(arr, n) :
     
     return diff // (n - 1)
 
-def validate_peak_amplitudes(moving_average_signal, peak_indices, amplitude_variation_threshold=180):
+def validate_peak_amplitudes(moving_average_signal, peak_indices, amplitude_variation_threshold=60):
     """
+    TODO fix this function to only remove the peaks that are not valid correctly
     Checks if each peak amplitude is within a threshold difference from the last peak.
     Returns True if more than half of the amplitude variations are within the threshold, False otherwise.
     Prints intermediate values for debugging.
     """
     if len(peak_indices) < 2:
         print("Not enough peaks to validate.")
-        return False  # Not enough peaks to validate
+        return (False, [])  # Not enough peaks to validate
 
     valid_count = 0
     total_pairs = len(peak_indices) - 1
+    valid_peaks = [] 
 
     for i in range(1, len(peak_indices)):
         last_amp = moving_average_signal[peak_indices[i-1]]
         curr_amp = moving_average_signal[peak_indices[i]]
         print(f"Peak {i-1} index: {peak_indices[i-1]}, amplitude: {last_amp}")
         print(f"Peak {i} index: {peak_indices[i]}, amplitude: {curr_amp}")
-        if last_amp == 0:
-            print("Last amplitude is zero, cannot compute variation.")
-            continue
+        # if last_amp == 0:
+        #     print("Last amplitude is zero, cannot compute variation.")
+        #     continue
         higher_peak = max(last_amp, curr_amp)
         lower_peak = min(last_amp, curr_amp)
-        variation = abs(higher_peak-lower_peak)
+        variation = abs((higher_peak-lower_peak)/higher_peak) * 100
         print(f"Amplitude variation between peaks {i-1} and {i}: {variation}")
         if variation <= amplitude_variation_threshold:
             valid_count += 1
+            valid_peaks.append(peak_indices[i])
+            valid_peaks.append(peak_indices[i-1])
+            valid_peaks = list(set(valid_peaks))  # Remove duplicates
+            valid_peaks.sort()  # Sort the valid peaks
         else:
             print(f"Variation {variation} exceeds threshold {amplitude_variation_threshold}.")
 
     print(f"Valid amplitude variations: {valid_count} out of {total_pairs}")
-    return valid_count > (total_pairs // 2)
+    print(f"Valid peaks: {valid_peaks}")
+    result = (valid_count > (total_pairs // 2), valid_peaks)
+    
+    return result
 
 # --- Main Loop ---
 
@@ -266,10 +275,12 @@ sample_time_s = 5
 sample_len = 100 * sample_time_s
 filter_window = 35
 peak_distance_threshold = 40
+spo2_reading = []
 
 if setup_max30101():
     # wait for sensor to reach equibrilium 
     time.sleep_ms(200)
+    print("Sensor is ready.")
     while True:
         red_samples = []
         ir_samples = []
@@ -314,6 +325,9 @@ if setup_max30101():
         if not ir_mavg_variance <= 35000:
             print("IR moving average variance too high. Signal not valid.")
             continue
+        if not 100 < ir_mavg_variance :
+            print("IR moving average variance too low. Signal not valid.")
+            continue
 
         print(f"Variance of moving average IR: {ir_mavg_variance}")
         print(f"Variance of moving average RED: {red_mavg_variance}")
@@ -334,18 +348,26 @@ if setup_max30101():
         red_peak_count = len(red_peaks)
         print(f"ir peak count: {ir_peak_count}")
 
-        # TODO: remove the peaks that do not pass the threshold
         # --- validate peaks before continuing ---
-        if not validate_peak_amplitudes(moving_average_ir, ir_peaks):
+
+        ir_peaks_valid_flag, valid_ir_peaks = validate_peak_amplitudes(moving_average_ir, ir_peaks)
+        red_peaks_valid_flag, valid_red_peaks = validate_peak_amplitudes(moving_average_red, red_peaks)
+        
+
+        if not ir_peaks_valid_flag:
             print("IR peak amplitude variation too high between consecutive peaks. Signal not valid.")
             continue
-        if not validate_peak_amplitudes(moving_average_red, red_peaks):
+        if not red_peaks_valid_flag:
             print("RED peak amplitude variation too high between consecutive peaks. Signal not valid.")
             continue
 
+
+        valid_red_peaks_len = len(valid_red_peaks)
+        valid_ir_peaks_len = len(valid_ir_peaks)
+
         # find the average peak difference 
-        avg_ir_peak_diff = average_peak_difference(ir_peaks, ir_peak_count)
-        avg_red_peak_diff = average_peak_difference(red_peaks, red_peak_count)
+        avg_ir_peak_diff = average_peak_difference(valid_ir_peaks, valid_ir_peaks_len)
+        avg_red_peak_diff = average_peak_difference(valid_red_peaks, valid_red_peaks_len)
 
         print(f"avg ir peak diff: {avg_ir_peak_diff}")
         print(f"avg red peak diff: {avg_red_peak_diff}")
@@ -376,7 +398,12 @@ if setup_max30101():
 
         # calculate spo2
         spo2 = 110 - 25 * ratio_of_ratio
-        print(f"calculated spo2: {spo2}")
+        print(f"calculated spo2: {spo2:.2f}")
+
+        spo2_reading.append(spo2)
+        # calculate average of spo2 readings
+        avg_spo2 = sum(spo2_reading) / len(spo2_reading)
+        print(f"average spo2 from this session: {avg_spo2:.2f}")
 
         print(f"--" * 20)
 
