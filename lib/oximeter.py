@@ -248,7 +248,10 @@ def validate_peak_amplitudes(moving_average_signal, peak_indices, threshold=60):
     def _compare_variation(first_amp, second_amp):
         higher_peak = max(first_amp, second_amp)
         lower_peak = min(first_amp, second_amp)
-        variation = abs((higher_peak-lower_peak)/higher_peak) * 100
+        if higher_peak == 0:
+            # If both are zero, variation is 0; if only higher_peak is zero, variation is 100%
+            return 0.0 if lower_peak == 0 else 100.0
+        variation = abs((higher_peak - lower_peak) / higher_peak) * 100
         return variation
 
     for i in range(len(peak_indices)):
