@@ -1,4 +1,8 @@
-# A quick way to plot reading: https://gemini.google.com/share/f342573de92b
+# oximeter.py - Pulse Oximeter interface for MAX30101 on Raspberry Pi Pico W
+# Author: Parikshit Sah
+# Description: Reads, filters, and analyzes SpO2 and pulse data from the MAX30101 sensor.
+# Features: I2C communication, signal processing, peak detection, and SpO2 calculation.
+# Quick plotting tip: https://gemini.google.com/share/f342573de92b
 
 import machine
 import time
@@ -280,151 +284,143 @@ def validate_peak_amplitudes(moving_average_signal, peak_indices, threshold=60):
     
     return result
 
-# --- Main Loop ---
+if __name__ == "__main__":
+    sample_time_s = 5
+    sample_len = 100 * sample_time_s
+    filter_window = 35
+    peak_distance_threshold = 40
+    spo2_reading = []
 
-sample_time_s = 5
-sample_len = 100 * sample_time_s
-filter_window = 35
-peak_distance_threshold = 40
-spo2_reading = []
+    if setup_max30101():
+        # wait for sensor to reach equibrilium 
+        time.sleep_ms(200)
+        print("Sensor is ready.")
+        while True:
+            red_samples = []
+            ir_samples = []
 
-if setup_max30101():
-    # wait for sensor to reach equibrilium 
-    time.sleep_ms(200)
-    print("Sensor is ready.")
-    while True:
-        red_samples = []
-        ir_samples = []
+            # Read samples for 5 seconds
+            for i in range(0, sample_len):
+                red_val, ir_val = get_ir_red_values()
+                red_samples.append(red_val)
+                ir_samples.append(ir_val)
 
+                # we are reading 10 samples every 100ms which means we have 100 samples for each second
+                time.sleep_ms(10)
+            
 
-        # Read samples for 5 seconds
-        for i in range(0, sample_len):
-            red_val, ir_val = get_ir_red_values()
-            red_samples.append(red_val)
-            ir_samples.append(ir_val)
+            # calculate dc elements
+            ir_dc = sum(ir_samples) // len(ir_samples)
+            red_dc = sum(red_samples) // len(red_samples)
 
-            # we are reading 10 samples every 100ms which means we have 100 samples for each second
-            time.sleep_ms(10)
-        
+            print(f"ir dc: {ir_dc}")
+            print(f"red dc: {red_dc}")
 
-        # calculate dc elements
-        ir_dc = sum(ir_samples) // len(ir_samples)
-        red_dc = sum(red_samples) // len(red_samples)
+            # --- calculate AC component ---
 
-        print(f"ir dc: {ir_dc}")
-        print(f"red dc: {red_dc}")
-
-        # --- calculate AC component ---
-
-        #remove dc components from the values
-        processed_ir_samples = [num - ir_dc for num in ir_samples]
-        processed_red_samples = [num - red_dc for num in red_samples]
+            #remove dc components from the values
+            processed_ir_samples = [num - ir_dc for num in ir_samples]
+            processed_red_samples = [num - red_dc for num in red_samples]
 
 
-        # calculate moving average
-        moving_average_ir = moving_average(processed_ir_samples, sample_len, filter_window)
-        moving_average_red = moving_average(processed_red_samples, sample_len, filter_window)
+            # calculate moving average
+            moving_average_ir = moving_average(processed_ir_samples, sample_len, filter_window)
+            moving_average_red = moving_average(processed_red_samples, sample_len, filter_window)
 
-        print(f"moving average ir: {moving_average_ir}")
-        print(f"moving average red: {moving_average_red}")
-
-
-        # Calculate and print variance of moving averages
-        ir_mavg_variance = calculate_variance(moving_average_ir)
-        red_mavg_variance = calculate_variance(moving_average_red)
-
-        if not ir_mavg_variance <= 35000:
-            print("IR moving average variance too high. Signal not valid.")
-            continue
-        if not 100 < ir_mavg_variance :
-            print("IR moving average variance too low. Signal not valid.")
-            continue
-
-        print(f"Variance of moving average IR: {ir_mavg_variance}")
-        print(f"Variance of moving average RED: {red_mavg_variance}")
-
-        mavg_ir_len = len(moving_average_ir)
-        mavg_red_len = len(moving_average_red)
-
-        # print(f"processed ir samples: {processed_ir_samples}")
-        # print(f"actual ir samples: {ir_samples}")
-
-        # find peaks
-        ir_peaks = find_peaks(moving_average_ir, mavg_ir_len, peak_distance_threshold)
-        red_peaks = find_peaks(moving_average_red, mavg_red_len, peak_distance_threshold)
-        print(f"ir peaks: {ir_peaks}")
-        print(f"red peaks: {red_peaks}")
-        # count peaks
-        ir_peak_count =  len(ir_peaks)
-        red_peak_count = len(red_peaks)
-        print(f"ir peak count: {ir_peak_count}")
-
-        # --- validate peaks before continuing ---
-
-        ir_peaks_valid_flag, valid_ir_peaks = validate_peak_amplitudes(moving_average_ir, ir_peaks)
-        red_peaks_valid_flag, valid_red_peaks = validate_peak_amplitudes(moving_average_red, red_peaks)
-        
-
-        if not ir_peaks_valid_flag:
-            print("IR peak amplitude variation too high between consecutive peaks. Signal not valid.")
-            continue
-        if not red_peaks_valid_flag:
-            print("RED peak amplitude variation too high between consecutive peaks. Signal not valid.")
-            continue
+            print(f"moving average ir: {moving_average_ir}")
+            print(f"moving average red: {moving_average_red}")
 
 
-        valid_red_peaks_len = len(valid_red_peaks)
-        valid_ir_peaks_len = len(valid_ir_peaks)
+            # Calculate and print variance of moving averages
+            ir_mavg_variance = calculate_variance(moving_average_ir)
+            red_mavg_variance = calculate_variance(moving_average_red)
 
-        # find the average peak difference 
-        avg_ir_peak_diff = average_peak_difference(valid_ir_peaks, valid_ir_peaks_len)
-        avg_red_peak_diff = average_peak_difference(valid_red_peaks, valid_red_peaks_len)
+            if not ir_mavg_variance <= 35000:
+                print("IR moving average variance too high. Signal not valid.")
+                continue
+            if not 100 < ir_mavg_variance :
+                print("IR moving average variance too low. Signal not valid.")
+                continue
 
-        print(f"avg ir peak diff: {avg_ir_peak_diff}")
-        print(f"avg red peak diff: {avg_red_peak_diff}")
+            print(f"Variance of moving average IR: {ir_mavg_variance}")
+            print(f"Variance of moving average RED: {red_mavg_variance}")
 
-        # since 500 samples == 5 seconds, 1 sample is 5/500 is 0.01s or 10ms
-        # this means that the avg peak diff is in multiples of 0.01s or 10ms
-        # we need to convert it into seconds therefore
-        ir_ac = float( avg_ir_peak_diff * (sample_time_s / sample_len)) 
-        red_ac = float(avg_red_peak_diff * (sample_time_s / sample_len)) 
+            mavg_ir_len = len(moving_average_ir)
+            mavg_red_len = len(moving_average_red)
 
-        print(f"ir ac: {ir_ac}")
-        print(f"red ac: {red_ac}")
+            # print(f"processed ir samples: {processed_ir_samples}")
+            # print(f"actual ir samples: {ir_samples}")
 
+            # find peaks
+            ir_peaks = find_peaks(moving_average_ir, mavg_ir_len, peak_distance_threshold)
+            red_peaks = find_peaks(moving_average_red, mavg_red_len, peak_distance_threshold)
+            print(f"ir peaks: {ir_peaks}")
+            print(f"red peaks: {red_peaks}")
+            # count peaks
+            ir_peak_count =  len(ir_peaks)
+            red_peak_count = len(red_peaks)
+            print(f"ir peak count: {ir_peak_count}")
 
-        # calculate ir ratio
-        ir_ratio = ir_ac/ir_dc
-        
-        # calculate red ratio
-        red_ratio = red_ac / red_dc
+            # --- validate peaks before continuing ---
 
-        print(f"ir ratio: {ir_ratio}")
-        print(f"red ratio: {red_ratio}")
+            ir_peaks_valid_flag, valid_ir_peaks = validate_peak_amplitudes(moving_average_ir, ir_peaks)
+            red_peaks_valid_flag, valid_red_peaks = validate_peak_amplitudes(moving_average_red, red_peaks)
+            
 
-        # calculate R: ratio of ratio
-        ratio_of_ratio = red_ratio / ir_ratio
-
-        print(f"ratio of ratio: {ratio_of_ratio}")
-
-        # calculate spo2
-        spo2 = 110 - 25 * ratio_of_ratio
-        print(f"calculated spo2: {spo2:.2f}")
-
-        spo2_reading.append(spo2)
-        # calculate average of spo2 readings
-        avg_spo2 = sum(spo2_reading) / len(spo2_reading)
-        print(f"average spo2 from this session: {avg_spo2:.2f}")
-
-        print(f"--" * 20)
+            if not ir_peaks_valid_flag:
+                print("IR peak amplitude variation too high between consecutive peaks. Signal not valid.")
+                continue
+            if not red_peaks_valid_flag:
+                print("RED peak amplitude variation too high between consecutive peaks. Signal not valid.")
+                continue
 
 
+            valid_red_peaks_len = len(valid_red_peaks)
+            valid_ir_peaks_len = len(valid_ir_peaks)
+
+            # find the average peak difference 
+            avg_ir_peak_diff = average_peak_difference(valid_ir_peaks, valid_ir_peaks_len)
+            avg_red_peak_diff = average_peak_difference(valid_red_peaks, valid_red_peaks_len)
+
+            print(f"avg ir peak diff: {avg_ir_peak_diff}")
+            print(f"avg red peak diff: {avg_red_peak_diff}")
+
+            # since 500 samples == 5 seconds, 1 sample is 5/500 is 0.01s or 10ms
+            # this means that the avg peak diff is in multiples of 0.01s or 10ms
+            # we need to convert it into seconds therefore
+            ir_ac = float( avg_ir_peak_diff * (sample_time_s / sample_len)) 
+            red_ac = float(avg_red_peak_diff * (sample_time_s / sample_len)) 
+
+            print(f"ir ac: {ir_ac}")
+            print(f"red ac: {red_ac}")
 
 
+            # calculate ir ratio
+            ir_ratio = ir_ac/ir_dc
+            
+            # calculate red ratio
+            red_ratio = red_ac / red_dc
 
+            print(f"ir ratio: {ir_ratio}")
+            print(f"red ratio: {red_ratio}")
 
-else:
-    print("Failed to initialize MAX30101. Check wiring and power.")
+            # calculate R: ratio of ratio
+            ratio_of_ratio = red_ratio / ir_ratio
+
+            print(f"ratio of ratio: {ratio_of_ratio}")
+
+            # calculate spo2
+            spo2 = 110 - 25 * ratio_of_ratio
+            print(f"calculated spo2: {spo2:.2f}")
+
+            spo2_reading.append(spo2)
+            # calculate average of spo2 readings
+            avg_spo2 = sum(spo2_reading) / len(spo2_reading)
+            print(f"average spo2 from this session: {avg_spo2:.2f}")
+
+            print(f"--" * 20)
+    else:
+        print("Failed to initialize MAX30101. Check wiring and power.")
 
 # Optional: Put sensor in shutdown mode at the end
 # write_reg(REG_MODE_CONFIG, 0x80) # Set SHDN bit (Bit 7)

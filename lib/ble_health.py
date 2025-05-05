@@ -1,7 +1,11 @@
 # ble_health.py
-# MicroPython module for Raspberry Pi Pico W
-# Provides a BLE service with two characteristics (PulseOx and BPM) for sending integer values via notifications.
-# Designed to be imported and used in other programs.
+# MicroPython BLE Health Service for Raspberry Pi Pico W
+# Provides a BLE service with Pulse Oximetry (SpO2) and BPM characteristics for wireless health data transmission.
+# Author: Parikshit Sah
+# Date: May 5, 2025
+#
+# This module is designed to be imported and used in other MicroPython programs.
+# It sets up a BLE service, advertises the device, and allows sending SpO2 and BPM values via notifications.
 
 import bluetooth
 import time
@@ -25,6 +29,12 @@ _FLAG_BR_EDR_NOT_SUPPORTED = const(0x04)
 def _advertising_payload(limited_discoverable=False, br_edr_not_supported=True, name=None):
     """
     Internal function to generate a BLE advertising payload.
+    Args:
+        limited_discoverable (bool): If True, sets limited discoverable mode.
+        br_edr_not_supported (bool): If True, disables BR/EDR support.
+        name (str): Device name to advertise.
+    Returns:
+        bytearray: The advertising payload.
     """
     payload = bytearray()
 
@@ -50,6 +60,10 @@ def _advertising_payload(limited_discoverable=False, br_edr_not_supported=True, 
 
 # --- BLE Health Service Class ---
 class BLEHealthService:
+    """
+    BLEHealthService sets up a BLE service for SpO2 and BPM data transmission.
+    Use setup() to initialize and start advertising, and send_values() to send data.
+    """
     def __init__(self):
         self._ble = bluetooth.BLE()
         self._connections = set()
@@ -60,7 +74,7 @@ class BLEHealthService:
     def setup(self, device_name="PicoW_BLE_Health", interval_ms=500):
         """
         Set up the BLE service with the specified device name and advertising interval.
-        
+        Registers the GATT service and characteristics, and starts advertising.
         Args:
             device_name (str): Name of the device for advertising. Defaults to "PicoW_BLE_Health".
             interval_ms (int): Advertising interval in milliseconds. Defaults to 500ms.
@@ -110,7 +124,6 @@ class BLEHealthService:
     def send_values(self, pulseox_value, bpm_value):
         """
         Send values for PulseOx and BPM characteristics via notifications.
-        
         Args:
             pulseox_value (int): Value for PulseOx (SpO2), will be packed as a single byte.
             bpm_value (int): Value for BPM (Heart Rate), will be packed as a single byte.
@@ -149,6 +162,7 @@ class BLEHealthService:
     def _bt_irq(self, event, data):
         """
         Internal IRQ handler for BLE events.
+        Handles connections, disconnections, and writes to characteristics.
         """
         if event == 1:  # _IRQ_CENTRAL_CONNECT
             conn_handle, _, _ = data
@@ -170,7 +184,6 @@ class BLEHealthService:
     def is_setup(self):
         """
         Check if the BLE service is set up.
-        
         Returns:
             bool: True if set up, False otherwise.
         """
@@ -179,7 +192,6 @@ class BLEHealthService:
     def stop(self):
         """
         Stop advertising and deactivate BLE.
-        
         Returns:
             bool: True if stopped successfully, False otherwise.
         """
