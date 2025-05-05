@@ -8,7 +8,7 @@
 # over BLE using the BLEHealthService. The average is sent after every 4 readings.
 
 import time
-from oximeter import (
+from oximeter import ( #type: ignore
     setup_max30101, get_ir_red_values, moving_average, calculate_variance,
     find_peaks, average_peak_difference, validate_peak_amplitudes
 )
