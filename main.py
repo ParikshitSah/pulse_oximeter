@@ -79,7 +79,7 @@ if __name__ == "__main__":
             # Calculate bpm
             bpm = 60 / ir_ac if ir_ac > 0.01 else 0  # Avoid extremely high bpm due to very small ir_ac
             # Clip bpm to typical human range (40-200)
-            bpm = max(40, min(bpm, 200)) if bpm > 0 else 0
+            bpm = max(80, min(bpm, 200)) if bpm > 0 else 0
             print(f"calculated bpm: {bpm:.2f}")
 
             # Calculate ratios
