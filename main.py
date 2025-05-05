@@ -13,6 +13,8 @@ from oximeter import ( #type: ignore
     find_peaks, average_peak_difference, validate_peak_amplitudes
 )
 from lib.ble_health import BLEHealthService
+led = Pin("LED", Pin.OUT)  # Use "LED" for Pico W onboard LED
+led.value(1) 
 
 if __name__ == "__main__":
     # Configuration parameters
