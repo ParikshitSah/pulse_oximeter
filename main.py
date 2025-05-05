@@ -21,6 +21,7 @@ if __name__ == "__main__":
     filter_window = 35  # Moving average window size
     peak_distance_threshold = 40  # Minimum distance between peaks
     spo2_reading = []  # List to store SpO2 readings
+    bpm_readings = []  # List to store BPM readings
 
     # Initialize BLE health service
     ble = BLEHealthService()
@@ -74,19 +75,32 @@ if __name__ == "__main__":
             # Calculate AC components
             ir_ac = float(avg_ir_peak_diff * (sample_time_s / sample_len))
             red_ac = float(avg_red_peak_diff * (sample_time_s / sample_len))
+
+            # Calculate bpm
+            bpm = 60 / ir_ac if ir_ac > 0.01 else 0  # Avoid extremely high bpm due to very small ir_ac
+            # Clip bpm to typical human range (40-200)
+            bpm = max(40, min(bpm, 200)) if bpm > 0 else 0
+            print(f"calculated bpm: {bpm:.2f}")
+
             # Calculate ratios
-            ir_ratio = ir_ac / ir_dc
-            red_ratio = red_ac / red_dc
-            ratio_of_ratio = red_ratio / ir_ratio
+            ir_ratio = ir_ac / ir_dc if ir_dc != 0 else 0
+            red_ratio = red_ac / red_dc if red_dc != 0 else 0
+            ratio_of_ratio = red_ratio / ir_ratio if ir_ratio != 0 else 0
             # Calculate SpO2
             spo2 = 110 - 25 * ratio_of_ratio
             print(f"calculated spo2: {spo2:.2f}")
+
             spo2_reading.append(spo2)
-            avg_spo2 = sum(spo2_reading) / len(spo2_reading)
-            print(f"average spo2 from this session: {avg_spo2:.2f}")
-            # Send average SpO2 over BLE after every 4 readings
-            if len(spo2_reading) % 4 == 0:
-                ble.send_values(int(round(avg_spo2)), 0)  # BPM is 0 for now
+            # Append the calculated bpm to the bpm_readings list
+            bpm_readings.append(bpm)
+
+            # Send average SpO2 and BPM over BLE after every 4 readings
+            if len(spo2_reading) >= 4 and len(spo2_reading) % 4 == 0:
+                avg_spo2 = sum(spo2_reading[-4:]) / 4
+                avg_bpm = sum(bpm_readings[-4:]) / 4
+                print(f"average spo2 from last 4 readings: {avg_spo2:.2f}")
+                print(f"average bpm from last 4 readings: {avg_bpm:.2f}")
+                ble.send_values(int(round(avg_spo2)), int(round(avg_bpm)))
             print(f"--" * 20)
     else:
         print("Failed to initialize MAX30101. Check wiring and power.")
