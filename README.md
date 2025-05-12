@@ -13,6 +13,12 @@ This project implements a wireless pulse oximeter using the MAX30101 sensor and 
 - **BLE Transmission:** Results are sent wirelessly using a custom BLE health service.
 - **MicroPython:** All code is written for MicroPython running on the Pico W.
 
+### Developed Pulse Oximeter
+![IMG_9977](https://github.com/user-attachments/assets/34dceb07-63f0-4844-9037-b74eaf3de6dd)
+
+
+
+
 ---
 
 ## Directory Structure
