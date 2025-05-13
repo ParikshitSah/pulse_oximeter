@@ -16,7 +16,8 @@ This project implements a wireless pulse oximeter using the MAX30101 sensor and 
 ### Developed Pulse Oximeter
 ![IMG_9977](https://github.com/user-attachments/assets/34dceb07-63f0-4844-9037-b74eaf3de6dd)
 
-
+### Sample IR readings 
+![[sample readings/Steph finger white.png](https://github.com/ParikshitSah/pulse_oximeter/blob/979a6c61def44bd23dcdfe8769e3357dd3f3bac2/sample%20readings/Steph%20finger%20white.png))](https://github.com/ParikshitSah/pulse_oximeter/blob/979a6c61def44bd23dcdfe8769e3357dd3f3bac2/sample%20readings/steph%20white%20finger.png)
 
 
 ---
